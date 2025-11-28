@@ -1,0 +1,58 @@
+
+Here are the step-by-step instructions for key management, sending, and receiving encrypted emails.
+
+ 1.  Key Management: Generating Your PGP Key
+
+Before you can encrypt or sign emails, you need a personal PGP key pair.
+
+1.  **Open Account Settings:** In Thunderbird, go to the **three-line Menu icon** ($\equiv$) in the top right, select **Account Settings**.
+2.  **Select Security:** In the left pane, select the email account you want to use for PGP. Then click on **End-To-End Encryption** (or **Security** in older versions).
+3.  **Generate a Key:** Under the **OpenPGP** section, select **Add Key...** $\to$ **Generate New OpenPGP Key**.
+4.  **Key Parameters:**
+    * Set the **Expiration Date** (leaving it at "Never" is common, but setting an expiry for rotation is more secure).
+    * **Crucially**, set a **strong Passphrase**. This protects your private key.
+5.  **Confirm Generation:** Click **Generate Key**. Your private key is now stored locally and is protected by your passphrase.
+
+---
+
+## 2.  Exchanging Public Keys
+
+PGP encryption is asymmetric: you encrypt the message with the recipient's **public key**, and they decrypt it with their **private key**. You must obtain and import the recipient's public key, and they must import yours.
+
+### A. Sharing Your Public Key
+
+1.  **Find Your Key:** Go back to **Account Settings** $\to$ **End-To-End Encryption**. Under the OpenPGP section, click **Manage Keys...** to open the **OpenPGP Key Manager**.
+2.  **Export Your Public Key:** Right-click on your key and select **Export Public Key to File...**
+3.  **Send the File:** Send this exported public key file (it will end in `.asc` or `.pub`) to your recipient via a secure channel (or even via a regular, unencrypted email).
+
+### B. Importing the Recipient's Public Key
+
+1.  **Receive the Key:** Wait for your recipient to send you their public key file.
+2.  **Import the Key:** Go to **OpenPGP Key Manager** (as above) $\to$ **File** $\to$ **Import Public Key(s) from File**. Select the file the recipient sent you.
+3.  **Certify the Key (Optional but Recommended):** In the Key Manager, right-click the imported key and select **Certify** (or **Set Owner Trust**). This confirms that you believe the key genuinely belongs to the recipient, protecting against Man-in-the-Middle attacks.
+
+---
+
+## 3.  Sending a PGP Encrypted Email
+
+This assumes you have successfully imported the recipient's public key (Step 2B).
+
+1.  **Compose a New Email:** Click **Write** to start a new message to the recipient.
+2.  **Enter Recipient:** Ensure the recipient's email address is entered, and that Thunderbird recognizes a valid PGP key is available for that address.
+3.  **Enable Encryption and Signing:** Look for the **Security** dropdown menu or the **Lock and Quill/Signature icons** in the Compose window header.
+    * Click the **Lock icon** to enable **Encryption**. (It should turn blue or green).
+    * Click the **Quill icon** to enable **Digital Signing** (recommended, proves the message came from you).
+    * **Note:** If the lock icon is grayed out, it means Thunderbird cannot find a public key for the recipient.
+4.  **Send:** Click **Send**. You may be prompted to enter your **private key passphrase** if you haven't recently.
+
+---
+
+## 4.  Receiving a PGP Encrypted Email
+
+This assumes the sender used your imported public key to encrypt the message.
+
+1.  **Open the Encrypted Email:** Click on the new message in your inbox.
+2.  **Decryption Prompt:** Thunderbird will automatically recognize the message is encrypted.
+3.  **Enter Passphrase:** A prompt will appear asking for the **passphrase** you set when you generated your **private key** (Step 1).
+4.  **Read the Message:** Once the correct passphrase is entered, Thunderbird uses your private key to decrypt the email, and the content will be displayed normally.
+5.  **Verify Signature:** If the sender also signed the email, a green notification should appear stating the signature is **valid**, confirming the sender's identity and that the message hasn't been tampered with.
